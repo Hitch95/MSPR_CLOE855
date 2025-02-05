@@ -6,3 +6,11 @@ CREATE TABLE clients (
     prenom TEXT NOT NULL,
     adresse TEXT NOT NULL
 );
+
+DROP TABLE IF EXISTS logs;
+CREATE TABLE logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    action TEXT
+);

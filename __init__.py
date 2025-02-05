@@ -8,7 +8,13 @@ import sqlite3
 app = Flask(__name__)                                                                                                                  
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'  # Clé secrète pour les sessions
 
-# Fonction pour créer une clé "authentifie" dans la session utilisateur
+def log_action(username, action):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO logs (username, action) VALUES (?, ?)', (username, action))
+    conn.commit()
+    conn.close()
+
 def est_authentifie():
     return session.get('authentifie')
 
@@ -19,38 +25,42 @@ def hello_world():
 @app.route('/lecture')
 def lecture():
     if not est_authentifie():
-        # Rediriger vers la page d'authentification si l'utilisateur n'est pas authentifié
         return redirect(url_for('authentification'))
-
-  # Si l'utilisateur est authentifié
+    log_action(session.get('username'), 'Accès à la page de lecture')
     return "<h2>Bravo, vous êtes authentifié</h2>"
 
 @app.route('/authentification', methods=['GET', 'POST'])
 def authentification():
     if request.method == 'POST':
-        # Vérifier les identifiants
-        if request.form['username'] == 'admin' and request.form['password'] == 'password': # password à cacher par la suite
+        username = request.form['username']
+        password = request.form['password']
+        if username == 'admin' and password == 'password':  # password à cacher par la suite
             session['authentifie'] = True
-            # Rediriger vers la route lecture après une authentification réussie
+            session['username'] = username
+            log_action(username, 'Authentification réussie')
             return redirect(url_for('lecture'))
         else:
-            # Afficher un message d'erreur si les identifiants sont incorrects
+            log_action(username, 'Authentification échouée')
             return render_template('formulaire_authentification.html', error=True)
-
     return render_template('formulaire_authentification.html', error=False)
 
 @app.route('/fiche_client/<int:post_id>')
 def Readfiche(post_id):
+    if not est_authentifie():
+        return redirect(url_for('authentification'))
+    log_action(session.get('username'), f'Consultation de la fiche client {post_id}')
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM clients WHERE id = ?', (post_id,))
     data = cursor.fetchall()
     conn.close()
-    # Rendre le template HTML et transmettre les données
     return render_template('read_data.html', data=data)
 
 @app.route('/consultation/')
 def ReadBDD():
+    if not est_authentifie():
+        return redirect(url_for('authentification'))
+    log_action(session.get('username'), 'Consultation de la base de données')
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM clients;')
@@ -60,22 +70,34 @@ def ReadBDD():
 
 @app.route('/enregistrer_client', methods=['GET'])
 def formulaire_client():
-    return render_template('formulaire.html')  # afficher le formulaire
+    if not est_authentifie():
+        return redirect(url_for('authentification'))
+    return render_template('formulaire.html')
 
 @app.route('/enregistrer_client', methods=['POST'])
 def enregistrer_client():
+    if not est_authentifie():
+        return redirect(url_for('authentification'))
     nom = request.form['nom']
     prenom = request.form['prenom']
-
-    # Connexion à la base de données
+    log_action(session.get('username'), 'Enregistrement d\'un nouveau client')
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-
-    # Exécution de la requête SQL pour insérer un nouveau client
-    cursor.execute('INSERT INTO clients (created, nom, prenom, adresse) VALUES (?, ?, ?, ?)', (1002938, nom, prenom, "ICI"))
+    cursor.execute('INSERT INTO clients (nom, prenom, adresse) VALUES (?, ?, ?)', (nom, prenom, "ICI"))
     conn.commit()
     conn.close()
-    return redirect('/consultation/')  # Rediriger vers la page d'accueil après l'enregistrement
-                                                                                                                                       
+    return redirect('/consultation/')
+
+@app.route('/logs')
+def logs():
+    if not est_authentifie():
+        return redirect(url_for('authentification'))
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM logs ORDER BY timestamp DESC')
+    logs = cursor.fetchall()
+    conn.close()
+    return render_template('logs.html', logs=logs)
+
 if __name__ == "__main__":
-  app.run(debug=True)
+    app.run(debug=True)
