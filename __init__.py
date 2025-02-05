@@ -16,7 +16,9 @@ def log_action(username, action):
     conn.close()
 
 def est_authentifie():
-    return session.get('authentifie')
+    is_auth = session.get('authentifie')
+    print(f"Debug: est_authentifie() returned {is_auth}")
+    return is_auth
 
 @app.route('/')
 def hello_world():
@@ -88,16 +90,20 @@ def enregistrer_client():
     conn.close()
     return redirect('/consultation/')
 
-@app.route('/logs')
+@app.route('/logs', methods=['GET'])
 def logs():
+    print(f"Debug: Session data: {session}")
     if not est_authentifie():
+        print("Debug: User not authenticated, redirecting")
         return redirect(url_for('authentification'))
+    print("Debug: User authenticated, fetching logs")
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM logs ORDER BY timestamp DESC')
     logs = cursor.fetchall()
     conn.close()
     return render_template('logs.html', logs=logs)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
